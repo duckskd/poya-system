@@ -43,10 +43,17 @@
 
         const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 200 });
         html5QrcodeScanner.render((decodedText) => {
-            // 智慧解析：如果是網址，取最後一段當作 ID
-            const parts = decodedText.split('/');
-            const id = parts[parts.length - 1];
-            document.getElementById('qr-input').value = id;
+            let finalId = decodedText;
+            // 智慧解析：自動抓取 ?id= 的參數，若無則取路徑最後一段
+            if (decodedText.includes('?id=')) {
+                const urlParams = new URLSearchParams(decodedText.split('?')[1]);
+                finalId = urlParams.get('id');
+            } else if (decodedText.includes('/')) {
+                const parts = decodedText.split('/');
+                finalId = parts[parts.length - 1];
+            }
+            
+            document.getElementById('qr-input').value = finalId;
             searchMember();
         });
 
