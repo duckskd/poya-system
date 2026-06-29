@@ -20,9 +20,7 @@
 
         <div class="p-6">
             <h3 class="text-gray-600 font-semibold mb-4">點數餘額走勢</h3>
-            <div class="relative w-full h-64">
-                <canvas id="usageChart"></canvas>
-            </div>
+            <div class="relative w-full h-64"><canvas id="usageChart"></canvas></div>
         </div>
     </div>
 
@@ -41,7 +39,6 @@
                 return;
             }
 
-            // 1. 取得用戶最新資料 (當前餘額)
             const { data: userData } = await myClient.from('Users').select('*').eq('external_qr_id', memberId).single();
             if (!userData) {
                 document.getElementById("user-name").innerText = "查無此會員";
@@ -50,56 +47,39 @@
             document.getElementById("user-name").innerText = userData.name;
             document.getElementById("user-vouchers").innerText = userData.vouchers;
 
-            // 2. 取得消費紀錄 (必須由新到舊排序，因為我們要從現在往回推算)
             const { data: logs } = await myClient
                 .from('UsageLogs')
                 .select('change_amount, created_at')
                 .eq('user_id', memberId)
                 .order('created_at', { ascending: false }); 
 
-            // 3. 繪製圖表 (計算歷史餘額)
             if (logs) {
-                let currentBalance = userData.vouchers; // 從目前的餘額開始
-                let chartLabels = [];
-                let chartData = [];
+                let currentBalance = userData.vouchers;
+                let chartLabels = ["現在"];
+                let chartData = [currentBalance];
 
-                // 加入「現在」的時間點
-                chartLabels.push("現在");
-                chartData.push(currentBalance);
-
-                // 迴圈反向推算過去的餘額
                 logs.forEach(log => {
-                    currentBalance -= log.change_amount; // 減去變動量，回到過去的餘額
+                    currentBalance -= log.change_amount;
                     const date = new Date(log.created_at);
                     chartLabels.push(`${(date.getMonth()+1)}/${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`);
                     chartData.push(currentBalance);
                 });
 
-                // 因為我們是從現在推算到過去，所以資料要反轉回來給 Chart.js 畫圖 (由舊到新)
-                chartLabels.reverse();
-                chartData.reverse();
-                
                 new Chart(document.getElementById('usageChart'), {
                     type: 'line',
                     data: {
-                        labels: chartLabels,
+                        labels: chartLabels.reverse(),
                         datasets: [{
                             label: '可用點數',
-                            data: chartData,
-                            borderColor: '#10b981', // 綠色
+                            data: chartData.reverse(),
+                            borderColor: '#10b981',
                             tension: 0.3,
                             fill: true,
                             backgroundColor: 'rgba(16, 185, 129, 0.1)'
                         }]
                     },
-                    options: { 
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: { y: { ticks: { stepSize: 1 } } }
-                    }
+                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { stepSize: 1 } } } }
                 });
-            } else {
-                document.getElementById("usageChart").parentElement.innerHTML = "<p class='text-center text-gray-400 mt-10'>尚無變動紀錄</p>";
             }
         };
     </script>
