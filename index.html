@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POYA 商家核銷系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 flex flex-col items-center">
+
+    <div class="w-full max-w-md bg-white p-6 rounded-2xl shadow-lg">
+        <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">商家核銷系統</h2>
+        
+        <div id="reader" class="rounded-lg overflow-hidden mb-4 border-2 border-gray-200"></div>
+
+        <div class="flex gap-2 mb-4">
+            <input type="text" id="qr-input" class="flex-1 border p-2 rounded-lg" placeholder="掃描或輸入 ID">
+            <button onclick="searchMember()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">搜尋</button>
+        </div>
+        
+        <p id="status" class="text-center text-sm text-gray-500 mb-4"></p>
+
+        <div id="action-panel" class="hidden border-t pt-4">
+            <div class="text-center mb-4">
+                <p class="text-gray-600">會員: <span id="res-name" class="font-bold text-lg"></span></p>
+                <p class="text-gray-600">目前點數: <span id="res-vouchers" class="font-bold text-2xl text-blue-600">0</span></p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="updateVouchers(-1)" class="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600">扣除 1 點</button>
+                <button onclick="updateVouchers(1)" class="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">新增 1 點</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化 Supabase
+        const myClient = supabase.createClient(
+            'https://eqrbhvvuraqrivbeldil.supabase.co', 
+            'sb_publishable_7NHGwJahIgUJhJ4M8_gODg_EnHfvpkg'
+        );
+
+        let currentId = "";
+
+        // 初始化掃描器
+        const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 200 });
+        html5QrcodeScanner.render((decodedText) => {
+            document.getElementById('qr-input').value = decodedText;
+            searchMember();
+        });
+
+        // 搜尋會員
+        async function searchMember() {
+            const qrId = document.getElementById('qr-input').value;
+            const status = document.getElementById('status');
+            const panel = document.getElementById('action-panel');
+            
+            status.innerText = "搜尋中...";
+            panel.classList.add('hidden');
+            
+            const { data, error } = await myClient.from('Users').select('*').eq('external_qr_id', qrId);
+
+            if (error || !data || data.length === 0) {
+                status.innerText = "查無此會員";
+            } else {
+                status.innerText = "搜尋成功！";
+                panel.classList.remove('hidden');
+                currentId = data[0].external_qr_id;
+                document.getElementById("res-name").innerText = data[0].name;
+                document.getElementById("res-vouchers").innerText = data[0].vouchers;
+            }
+        }
+
+        // 更新點數與紀錄
+        async function updateVouchers(change) {
+            const currentVal = parseInt(document.getElementById("res-vouchers").innerText);
+            const newVal = currentVal + change;
+
+            // 1. 更新 Users 資料表 (主要功能)
+            const { error: userErr } = await myClient.from('Users').update({ vouchers: newVal }).eq('external_qr_id', currentId);
+            
+            if (userErr) {
+                alert("更新點數失敗: " + userErr.message);
+                return;
+            }
+
+            // 2. 寫入 UsageLogs (防呆處理：如果表不存在，不影響點數更新)
+            try {
+                await myClient.from('UsageLogs').insert([{ user_id: currentId, change_amount: change }]);
+            } catch (e) {
+                console.warn("UsageLogs 表格尚未建立，紀錄功能暫停。");
+            }
+
+            // 更新畫面
+            document.getElementById("res-vouchers").innerText = newVal;
+            alert("更新成功！");
+        }
+    </script>
+</body>
+</html>

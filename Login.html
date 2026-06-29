@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>POYA 會員掃碼登入</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; }
+        #reader { width: 100%; max-width: 400px; margin: auto; }
+    </style>
+</head>
+<body>
+    <h2>請對準會員 QR Code</h2>
+    <div id="reader"></div>
+
+    <script>
+        // 初始化掃描器
+        function onScanSuccess(decodedText) {
+            // 掃描成功後，跳轉到 Member.html 並把 ID 帶過去 (例如: Member.html?id=mindy)
+            window.location.href = "Member.html?id=" + decodedText;
+        }
+
+        let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+        html5QrcodeScanner.render(onScanSuccess);
+    </script>
+</body>
+</html>
