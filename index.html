@@ -12,7 +12,6 @@
 
     <div class="w-full max-w-md bg-white p-6 rounded-2xl shadow-lg">
         <h2 class="text-2xl font-bold mb-4 text-center text-gray-800">商家核銷系統</h2>
-        
         <div id="reader" class="rounded-lg overflow-hidden mb-4 border-2 border-gray-200"></div>
 
         <div class="flex gap-2 mb-4">
@@ -35,7 +34,6 @@
     </div>
 
     <script>
-        // 初始化 Supabase
         const myClient = supabase.createClient(
             'https://eqrbhvvuraqrivbeldil.supabase.co', 
             'sb_publishable_7NHGwJahIgUJhJ4M8_gODg_EnHfvpkg'
@@ -43,16 +41,17 @@
 
         let currentId = "";
 
-        // 初始化掃描器
         const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 200 });
         html5QrcodeScanner.render((decodedText) => {
-            document.getElementById('qr-input').value = decodedText;
+            // 智慧解析：如果是網址，取最後一段當作 ID
+            const parts = decodedText.split('/');
+            const id = parts[parts.length - 1];
+            document.getElementById('qr-input').value = id;
             searchMember();
         });
 
-        // 搜尋會員
         async function searchMember() {
-            const qrId = document.getElementById('qr-input').value;
+            const qrId = document.getElementById('qr-input').value.trim();
             const status = document.getElementById('status');
             const panel = document.getElementById('action-panel');
             
@@ -72,27 +71,23 @@
             }
         }
 
-        // 更新點數與紀錄
         async function updateVouchers(change) {
             const currentVal = parseInt(document.getElementById("res-vouchers").innerText);
             const newVal = currentVal + change;
 
-            // 1. 更新 Users 資料表 (主要功能)
             const { error: userErr } = await myClient.from('Users').update({ vouchers: newVal }).eq('external_qr_id', currentId);
             
             if (userErr) {
-                alert("更新點數失敗: " + userErr.message);
+                alert("更新失敗: " + userErr.message);
                 return;
             }
 
-            // 2. 寫入 UsageLogs (防呆處理：如果表不存在，不影響點數更新)
             try {
                 await myClient.from('UsageLogs').insert([{ user_id: currentId, change_amount: change }]);
             } catch (e) {
-                console.warn("UsageLogs 表格尚未建立，紀錄功能暫停。");
+                console.warn("紀錄表無法寫入");
             }
 
-            // 更新畫面
             document.getElementById("res-vouchers").innerText = newVal;
             alert("更新成功！");
         }
